@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>300 DPI Upscaler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: two columns on wide screens (steps on the left, proof on the right), one column on phones.
+   Visual idea: a print proofing bench. Magenta is the process-colour accent, crop-mark brackets frame each preview. */
+:root {
+  --bg: #f5f4f6;
+  --surface: #ffffff;
+  --fg: #1c1921;
+  --muted: #6b6574;
+  --line: #dcd8e0;
+  --accent: #c01f65;
+  --accent-fg: #ffffff;
+  --accent-soft: #f8e6ee;
+  --warn: #9a5b00;
+  --font-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151318; --surface: #1e1b23; --fg: #eeebf1; --muted: #a39dad; --line: #35313d;
+    --accent: #f0589a; --accent-fg: #1b0610; --accent-soft: #3a1a2a; --warn: #e5a94d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151318; --surface: #1e1b23; --fg: #eeebf1; --muted: #a39dad; --line: #35313d;
+  --accent: #f0589a; --accent-fg: #1b0610; --accent-soft: #3a1a2a; --warn: #e5a94d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 24px 48px; }
+.wrap { max-width: 980px; margin-inline: auto; display: flex; flex-direction: column; gap: 24px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 5vw, 2.4rem); line-height: 1.05; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 60ch; margin-top: 8px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (min-width: 800px) { .grid { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); } .proof { position: sticky; top: 16px; } }
+
+.steps { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.step-head { display: flex; align-items: baseline; gap: 10px; }
+.step-n { font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+
+label.lab, .lab { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
+.field { display: flex; flex-direction: column; min-width: 0; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.row > .field { flex: 1 1 120px; }
+
+input[type="number"], select { width: 100%; font: inherit; font-family: var(--font-mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; min-height: 40px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 8px 14px; cursor: pointer; font-size: 0.9rem; border-right: 1px solid var(--line); background: var(--bg); color: var(--fg); min-height: 38px; display: flex; align-items: center; }
+.seg label:last-of-type { border-right: 0; }
+.seg input:checked + label { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 18px 14px; text-align: center; cursor: pointer; display: flex; flex-direction: column; gap: 4px; background: var(--bg); }
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { font-weight: 600; }
+.drop span { color: var(--muted); font-size: 0.85rem; }
+#file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+#file:focus-visible + .drop { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button { font: inherit; cursor: pointer; border-radius: 8px; padding: 10px 16px; min-height: 42px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 500; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+button.primary:hover:not(:disabled) { filter: brightness(1.06); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.link { background: none; border: 0; padding: 4px 0; min-height: 0; color: var(--accent); text-decoration: underline; font-weight: 500; text-align: left; }
+
+.out { display: flex; justify-content: space-between; gap: 12px; font-size: 0.78rem; color: var(--muted); }
+.readout { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.readout .big { font-family: var(--font-mono); font-size: 1.02rem; font-weight: 500; overflow-wrap: anywhere; }
+.readout .sub { color: var(--muted); font-family: var(--font-mono); font-size: 0.82rem; overflow-wrap: anywhere; }
+.note { color: var(--warn); font-size: 0.85rem; }
+.status { color: var(--muted); font-size: 0.88rem; min-height: 1.3em; }
+
+.proof { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.panel-head .meta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); }
+.frame { position: relative; padding: 14px; }
+.frame canvas { display: block; max-width: 100%; height: auto; margin-inline: auto; background:
+  repeating-conic-gradient(var(--line) 0 25%, var(--surface) 0 50%) 0 0 / 14px 14px; }
+.m { position: absolute; width: 12px; height: 12px; border: 0 solid var(--muted); }
+.m.tl { top: 0; left: 0; border-top-width: 1px; border-left-width: 1px; }
+.m.tr { top: 0; right: 0; border-top-width: 1px; border-right-width: 1px; }
+.m.bl { bottom: 0; left: 0; border-bottom-width: 1px; border-left-width: 1px; }
+.m.br { bottom: 0; right: 0; border-bottom-width: 1px; border-right-width: 1px; }
+.empty { color: var(--muted); font-size: 0.9rem; padding: 28px 8px; text-align: center; }
+.actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.fine { color: var(--muted); font-size: 0.82rem; max-width: 62ch; }
+@media (prefers-reduced-motion: no-preference) { button, .drop { transition: border-color 0.15s, background 0.15s; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>300 DPI Upscaler</h1>
+    <p class="lede">Enlarge a picture to the pixel size a 300 DPI print needs, then save it with 300 DPI written into the file. Everything runs in your browser. The image never leaves this page.</p>
+  </header>
+
+  <div class="grid">
+    <div class="steps">
+      <section class="step" aria-labelledby="h-img">
+        <div class="step-head"><span class="step-n">Step 1</span><h2 id="h-img">Choose an image</h2></div>
+        <input type="file" id="file" accept="image/*">
+        <label class="drop" id="drop" for="file">
+          <strong>Choose a file or drop it here</strong>
+          <span>JPG, PNG, WebP or GIF</span>
+        </label>
+        <div class="out"><span id="srcName">Sample image</span><span id="srcDims" class="mono"></span></div>
+        <button type="button" class="link" id="sampleBtn">Use the sample image again</button>
+      </section>
+
+      <section class="step" aria-labelledby="h-size">
+        <div class="step-head"><span class="step-n">Step 2</span><h2 id="h-size">Set the size</h2></div>
+        <div>
+          <span class="lab" id="modeLab">Size by</span>
+          <div class="seg" role="radiogroup" aria-labelledby="modeLab">
+            <input type="radio" name="mode" id="modePrint" value="print" checked><label for="modePrint">Print size</label>
+            <input type="radio" name="mode" id="modeScale" value="scale"><label for="modeScale">Enlargement</label>
+          </div>
+        </div>
+
+        <div id="printGroup" class="steps" style="gap:12px">
+          <div class="field">
+            <label class="lab" for="preset">Paper size</label>
+            <select id="preset">
+              <option value="4x6">4 × 6 in</option>
+              <option value="5x7">5 × 7 in</option>
+              <option value="8x10" selected>8 × 10 in</option>
+              <option value="11x14">11 × 14 in</option>
+              <option value="16x20">16 × 20 in</option>
+              <option value="a5">A5</option>
+              <option value="a4">A4</option>
+              <option value="a3">A3</option>
+              <option value="custom">Custom width</option>
+            </select>
+          </div>
+          <div class="row" id="customRow" hidden>
+            <div class="field"><label class="lab" for="customVal">Print width</label><input type="number" id="customVal" min="0.5" max="200" step="0.1" value="10"></div>
+            <div class="field"><label class="lab" for="unit">Unit</label>
+              <select id="unit"><option value="in">inches</option><option value="cm">cm</option></select></div>
+          </div>
+          <p class="fine">The picture is fitted inside the paper size without cropping, so one side may come out slightly smaller than the paper.</p>
+        </div>
+
+        <div id="scaleGroup" hidden>
+          <span class="lab" id="scLab">Enlarge by</span>
+          <div class="seg" role="radiogroup" aria-labelledby="scLab">
+            <input type="radio" name="sc" id="sc2" value="2"><label for="sc2">2×</label>
+            <input type="radio" name="sc" id="sc3" value="3" checked><label for="sc3">3×</label>
+            <input type="radio" name="sc" id="sc4" value="4"><label for="sc4">4×</label>
+          </div>
+        </div>
+
+        <div class="readout" aria-live="polite">
+          <div class="big" id="roPx">…</div>
+          <div class="sub" id="roIn"></div>
+          <div class="note" id="roNote" hidden></div>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="h-fin">
+        <div class="step-head"><span class="step-n">Step 3</span><h2 id="h-fin">Finish and export</h2></div>
+        <div class="field">
+          <label class="lab" for="sharp">Sharpening <span class="mono" id="sharpVal">30</span></label>
+          <input type="range" id="sharp" min="0" max="100" value="30">
+        </div>
+        <div>
+          <span class="lab" id="fmtLab">File type</span>
+          <div class="seg" role="radiogroup" aria-labelledby="fmtLab">
+            <input type="radio" name="fmt" id="fmtPng" value="png" checked><label for="fmtPng">PNG</label>
+            <input type="radio" name="fmt" id="fmtJpg" value="jpg"><label for="fmtJpg">JPEG</label>
+          </div>
+        </div>
+        <div class="field" id="qRow" hidden>
+          <label class="lab" for="quality">JPEG quality <span class="mono" id="qVal">92</span></label>
+          <input type="range" id="quality" min="60" max="100" value="92">
+        </div>
+        <button type="button" class="primary" id="runBtn">Upscale to 300 DPI</button>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <div class="proof">
+      <section class="panel" aria-labelledby="h-orig">
+        <div class="panel-head"><h2 id="h-orig">Original</h2><span class="meta" id="metaOrig"></span></div>
+        <div class="frame"><i class="m tl"></i><i class="m tr"></i><i class="m bl"></i><i class="m br"></i>
+          <canvas id="cOrig" width="10" height="10" aria-label="Preview of the original image"></canvas></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-out">
+        <div class="panel-head"><h2 id="h-out">Upscaled</h2><span class="meta" id="metaOut"></span></div>
+        <div class="frame"><i class="m tl"></i><i class="m tr"></i><i class="m bl"></i><i class="m br"></i>
+          <div class="empty" id="outEmpty">Your upscaled image appears here.</div>
+          <canvas id="cOut" width="10" height="10" hidden aria-label="Preview of the upscaled image"></canvas></div>
+        <div class="actions" id="saveRow" hidden>
+          <button type="button" class="primary" id="saveBtn">Save file</button>
+          <span class="mono fine" id="saveInfo"></span>
+        </div>
+                <p class="fine">Enlarging adds pixels, not detail. A sharp, well-exposed original gives the best print. The previews above are scaled down to fit the screen.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var DPI = 300;
+  var MAX_SIDE = 16000, MAX_PIXELS = 120e6;
+  var PRESETS = { "4x6": [4, 6], "5x7": [5, 7], "8x10": [8, 10], "11x14": [11, 14], "16x20": [16, 20], "a5": [5.83, 8.27], "a4": [8.27, 11.69], "a3": [11.69, 16.54] };
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { img: null, w: 0, h: 0, name: "sample", result: null, busy: false, downloads: null, dlChecked: false };
+
+  var tick = function () { return new Promise(function (r) { setTimeout(r, 0); }); };
+  function fmtBytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+  function checked(name) { var el = document.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : ""; }
+  function setStatus(t) { $("status").textContent = t || ""; }
+
+  /* ---------- sample image ---------- */
+  function makeSample() {
+    var c = document.createElement("canvas"); c.width = 640; c.height = 420;
+    var x = c.getContext("2d");
+    var g = x.createLinearGradient(0, 0, 0, 420);
+    g.addColorStop(0, "#1f6f8b"); g.addColorStop(0.62, "#f2c28b"); g.addColorStop(1, "#f2c28b");
+    x.fillStyle = g; x.fillRect(0, 0, 640, 420);
+    x.fillStyle = "#fff3d6"; x.beginPath(); x.arc(470, 150, 54, 0, 7); x.fill();
+    x.fillStyle = "#2f4858"; x.beginPath(); x.moveTo(0, 300); x.lineTo(130, 190); x.lineTo(240, 280); x.lineTo(360, 170); x.lineTo(520, 310); x.lineTo(640, 240); x.lineTo(640, 420); x.lineTo(0, 420); x.fill();
+    x.fillStyle = "#1b2a35"; x.fillRect(0, 340, 640, 80);
+    x.strokeStyle = "#f2c28b"; x.lineWidth = 1;
+    for (var i = 0; i < 24; i++) { x.beginPath(); x.moveTo(20 + i * 8, 350); x.lineTo(20 + i * 8, 405); x.stroke(); }
+    for (var j = 0; j < 7; j++) { x.beginPath(); x.moveTo(20, 350 + j * 9); x.lineTo(204, 350 + j * 9); x.stroke(); }
+    x.fillStyle = "#fff"; x.font = "600 26px sans-serif"; x.fillText("Sample, 640 × 420 px", 232, 372);
+    x.font = "13px sans-serif"; x.fillText("Fine lines and small text show how the enlargement handles detail.", 232, 396);
+    return c;
+  }
+
+  /* ---------- loading ---------- */
+  function setSource(img, w, h, name) {
+    state.img = img; state.w = w; state.h = h; state.name = name;
+    $("srcName").textContent = name; $("srcDims").textContent = w + " × " + h + " px";
+    $("metaOrig").textContent = w + " × " + h + " px";
+    drawPreview($("cOrig"), img, w, h);
+    update();
+  }
+  function loadSample() { var c = makeSample(); setSource(c, c.width, c.height, "Sample image"); }
+  function loadFile(file) {
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { setStatus("That file is not an image. Choose a JPG, PNG, WebP or GIF."); return; }
+    var fr = new FileReader();
+    fr.onload = function () {
+      var im = new Image();
+      im.onload = function () { setSource(im, im.naturalWidth, im.naturalHeight, file.name); setStatus("Image loaded. Press Upscale when the size looks right."); };
+      im.onerror = function () { setStatus("This browser cannot open that image. Try saving it as a JPG or PNG first."); };
+      im.src = fr.result;
+    };
+    fr.onerror = function () { setStatus("The file could not be read. Try choosing it again."); };
+    fr.readAsDataURL(file);
+  }
+
+  function drawPreview(canvas, src, sw, sh) {
+    var max = 900, s = Math.min(1, max / Math.max(sw, sh));
+    canvas.width = Math.max(1, Math.round(sw * s)); canvas.height = Math.max(1, Math.round(sh * s));
+    var x = canvas.getContext("2d"); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
+    x.clearRect(0, 0, canvas.width, canvas.height);
+    x.drawImage(src, 0, 0, sw, sh, 0, 0, canvas.width, canvas.height);
+  }
+
+  /* ---------- target size ---------- */
+  function target() {
+    var w = state.w, h = state.h; if (!w) return null;
+    var tw, th;
+    if (checked("mode") === "scale") {
+      var f = parseFloat(checked("sc")) || 3; tw = Math.round(w * f); th = Math.round(h * f);
+    } else if ($("preset").value === "custom") {
+      var v = parseFloat($("customVal").value); if (!(v > 0)) return { error: "Enter a print width greater than zero." };
+      var inch = $("unit").value === "cm" ? v / 2.54 : v;
+      tw = Math.round(inch * DPI); th = Math.round(tw * h / w);
+    } else {
+      var p = PRESETS[$("preset").value], longS = Math.max(p[0], p[1]), shortS = Math.min(p[0], p[1]);
+      var bw = w >= h ? longS : shortS, bh = w >= h ? shortS : longS;
+      var s = Math.min(bw * DPI / w, bh * DPI / h); tw = Math.round(w * s); th = Math.round(h * s);
+    }
+    tw = Math.max(1, tw); th = Math.max(1, th);
+    return { w: tw, h: th, f: tw / w };
+  }
+
+  function update() {
+    var t = target(), note = $("roNote"); note.hidden = true; $("runBtn").disabled = state.busy;
+    if (!t) { $("roPx").textContent = "Choose an image to see the output size."; $("roIn").textContent = ""; return; }
+    if (t.error) { $("roPx").textContent = "—"; $("roIn").textContent = ""; note.textContent = t.error; note.hidden = false; $("runBtn").disabled = true; return; }
+    $("roPx").textContent = state.w + " × " + state.h + " px  →  " + t.w + " × " + t.h + " px";
+    $("roIn").textContent = (t.w / DPI).toFixed(2) + " × " + (t.h / DPI).toFixed(2) + " in  (" + (t.w / DPI * 2.54).toFixed(1) + " × " + (t.h / DPI * 2.54).toFixed(1) + " cm) at " + DPI + " DPI, " + t.f.toFixed(2) + "× enlargement";
+    var msg = "";
+    if (t.w > MAX_SIDE || t.h > MAX_SIDE || t.w * t.h > MAX_PIXELS) { msg = "That output is too large for a browser to build (" + Math.round(t.w * t.h / 1e6) + " megapixels). Choose a smaller print size."; $("runBtn").disabled = true; }
+    else if (t.f < 1) msg = "The output is smaller than the original, so this will shrink the image.";
+    else if (t.f > 4) msg = "That is a large enlargement. Expect a softer print.";
+    if (msg) { note.textContent = msg; note.hidden = false; }
+  }
+
+  /* ---------- resampling ---------- */
+  function stepTo(src, sw, sh, w, h) {
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var x = c.getContext("2d"); if (!x) throw new Error("canvas");
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
+    x.drawImage(src, 0, 0, sw, sh, 0, 0, w, h);
+    return c;
+  }
+  async function resize(img, sw, sh, tw, th) {
+    var cur = img, cw = sw, ch = sh, steps = 0;
+    while (true) {
+      var r = Math.max(tw / cw, th / ch), nw, nh;
+      if (r > 2) { nw = Math.round(cw * 2); nh = Math.round(ch * 2); }
+      else if (r < 0.5) { nw = Math.round(cw / 2); nh = Math.round(ch / 2); }
+      else { nw = tw; nh = th; }
+      steps++; setStatus("Enlarging, step " + steps + "…");
+      var next = stepTo(cur, cw, ch, nw, nh);
+      if (cur !== img) cur.width = 0;
+      cur = next; cw = nw; ch = nh;
+      if (cw === tw && ch === th) return cur;
+      await tick();
+    }
+  }
+
+  async function sharpen(src, k) {
+    var w = src.width, h = src.height, out = document.createElement("canvas"); out.width = w; out.height = h;
+    var sc = src.getContext("2d"), oc = out.getContext("2d"), BAND = 128;
+    for (var y0 = 0; y0 < h; y0 += BAND) {
+      var bh = Math.min(BAND, h - y0), top = y0 > 0 ? 1 : 0, bot = (y0 + bh < h) ? 1 : 0, rows = bh + top + bot;
+      var s = sc.getImageData(0, y0 - top, w, rows).data, dst = oc.createImageData(w, bh), d = dst.data;
+      var stride = w * 4;
+      for (var y = 0; y < bh; y++) {
+        var sy = y + top, ym = sy > 0 ? sy - 1 : sy, yp = sy < rows - 1 ? sy + 1 : sy;
+        var rM = ym * stride, rC = sy * stride, rP = yp * stride, o = y * stride;
+        for (var x = 0; x < w; x++) {
+          var xm = (x > 0 ? x - 1 : x) * 4, xc = x * 4, xp = (x < w - 1 ? x + 1 : x) * 4;
+          for (var c = 0; c < 3; c++) {
+            var v = s[rC + xc + c];
+            var b = (s[rM + xm + c] + 2 * s[rM + xc + c] + s[rM + xp + c] + 2 * s[rC + xm + c] + 4 * v + 2 * s[rC + xp + c] + s[rP + xm + c] + 2 * s[rP + xc + c] + s[rP + xp + c]) / 16;
+            d[o + xc + c] = v + k * (v - b);
+          }
+          d[o + xc + 3] = s[rC + xc + 3];
+        }
+      }
+      oc.putImageData(dst, 0, y0);
+      if ((y0 / BAND) % 4 === 3) { setStatus("Sharpening " + Math.round(y0 / h * 100) + "%…"); await tick(); }
+    }
+    src.width = 0;
+    return out;
+  }
+
+  /* ---------- DPI metadata ---------- */
+  var CRC = (function () { var t = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function pngWithDpi(bytes, dpi) {
+    var ppm = Math.round(dpi / 0.0254), ch = new Uint8Array(21), dv = new DataView(ch.buffer);
+    dv.setUint32(0, 9); ch.set([0x70, 0x48, 0x59, 0x73], 4); dv.setUint32(8, ppm); dv.setUint32(12, ppm); ch[16] = 1;
+    dv.setUint32(17, crc32(ch.subarray(4, 17)));
+    var out = new Uint8Array(bytes.length + 21);
+    out.set(bytes.subarray(0, 33), 0); out.set(ch, 33); out.set(bytes.subarray(33), 54);
+    return out;
+  }
+  function jpegWithDpi(bytes, dpi) {
+    if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) return bytes;
+    var hi = dpi >> 8, lo = dpi & 255;
+    var jfif = bytes[2] === 0xFF && bytes[3] === 0xE0 && bytes[6] === 0x4A && bytes[7] === 0x46 && bytes[8] === 0x49 && bytes[9] === 0x46;
+    if (jfif) { var o = bytes.slice(); o[13] = 1; o[14] = hi; o[15] = lo; o[16] = hi; o[17] = lo; return o; }
+    var app0 = [0xFF, 0xE0, 0, 16, 0x4A, 0x46, 0x49, 0x46, 0, 1, 1, 1, hi, lo, hi, lo, 0, 0];
+    var out = new Uint8Array(bytes.length + app0.length);
+    out.set(bytes.subarray(0, 2), 0); out.set(app0, 2); out.set(bytes.subarray(2), 2 + app0.length);
+    return out;
+  }
+  function toBlob(canvas, type, q) { return new Promise(function (res, rej) { canvas.toBlob(function (b) { b ? res(b) : rej(new Error("encode")); }, type, q); }); }
+
+  /* ---------- run ---------- */
+  async function run() {
+    if (state.busy || !state.img) return;
+    var t = target(); if (!t || t.error) return;
+    state.busy = true; $("runBtn").disabled = true; $("saveRow").hidden = true;
+    var png = checked("fmt") === "png", mime = png ? "image/png" : "image/jpeg";
+    try {
+      var c = await resize(state.img, state.w, state.h, t.w, t.h);
+      var k = parseInt($("sharp").value, 10) / 100 * 1.5;
+      if (k > 0) c = await sharpen(c, k);
+      setStatus("Encoding the file…"); await tick();
+      if (!png) {
+        var j = document.createElement("canvas"); j.width = c.width; j.height = c.height;
+        var jx = j.getContext("2d"); jx.fillStyle = "#ffffff"; jx.fillRect(0, 0, j.width, j.height); jx.drawImage(c, 0, 0);
+        c.width = 0; c = j;
+      }
+      var raw = await toBlob(c, mime, parseInt($("quality").value, 10) / 100);
+      var bytes = new Uint8Array(await raw.arrayBuffer());
+      var tagged = png ? pngWithDpi(bytes, DPI) : jpegWithDpi(bytes, DPI);
+      state.result = { blob: new Blob([tagged], { type: mime }), w: t.w, h: t.h, png: png };
+      drawPreview($("cOut"), c, c.width, c.height);
+      c.width = 0;
+      $("cOut").hidden = false; $("outEmpty").hidden = true;
+      $("metaOut").textContent = t.w + " × " + t.h + " px";
+      $("saveInfo").textContent = (png ? "PNG" : "JPEG") + " · " + fmtBytes(tagged.length) + " · " + DPI + " DPI";
+      $("saveRow").hidden = false;
+      setStatus("Done. The file is " + (t.w / DPI).toFixed(2) + " × " + (t.h / DPI).toFixed(2) + " in at " + DPI + " DPI.");
+      checkDownloads();
+    } catch (e) {
+      setStatus("Your browser could not build an image this large. Try a smaller print size or a smaller scale.");
+    }
+    state.busy = false; update();
+  }
+
+  /* ---------- saving ---------- */
+  function checkDownloads() {
+    if (state.dlChecked) return;
+    state.dlChecked = true;
+    var p = (window.claude && window.claude.use) ? window.claude.use("downloads") : Promise.resolve(null);
+    Promise.resolve(p).then(function (d) { state.downloads = d || null; }).catch(function () { state.downloads = null; });
+  }
+  async function save() {
+    if (!state.result) return;
+    var base = state.name.replace(/\.[^.]+$/, "").replace(/[^\w\- ]+/g, "").trim() || "image";
+    var name = base + "-" + DPI + "dpi." + (state.result.png ? "png" : "jpg");
+    if (state.downloads) {
+      try { await state.downloads.save({ filename: name, data: state.result.blob }); setStatus("Saved " + name + "."); }
+      catch (e) { setStatus(e && e.code === "declined" ? "Save cancelled." : "The file could not be saved from this view."); }
+      return;
+    }
+    var url = URL.createObjectURL(state.result.blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    setStatus("Saved " + name + " to your downloads.");
+  }
+
+  /* ---------- wiring ---------- */
+  function syncUi() {
+    var scale = checked("mode") === "scale";
+    $("printGroup").hidden = scale; $("scaleGroup").hidden = !scale;
+    $("customRow").hidden = scale || $("preset").value !== "custom";
+    $("qRow").hidden = checked("fmt") !== "jpg";
+    $("sharpVal").textContent = $("sharp").value; $("qVal").textContent = $("quality").value;
+    update();
+  }
+  function changed() { syncUi(); if (state.result && !state.busy) setStatus("Settings changed. Press Upscale to update the result."); }
+
+  ["modePrint", "modeScale", "preset", "customVal", "unit", "sc2", "sc3", "sc4", "sharp", "quality", "fmtPng", "fmtJpg"].forEach(function (id) {
+    $(id).addEventListener("input", changed); $(id).addEventListener("change", changed);
+  });
+  $("file").addEventListener("change", function (e) { loadFile(e.target.files && e.target.files[0]); });
+  $("sampleBtn").addEventListener("click", function () { loadSample(); setStatus("Sample loaded."); });
+  $("runBtn").addEventListener("click", run);
+  $("saveBtn").addEventListener("click", save);
+  var drop = $("drop");
+  ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+  drop.addEventListener("drop", function (e) { loadFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]); });
+
+  loadSample(); syncUi();
+  run();
+})();
+</script>
+</body>
+</html>
