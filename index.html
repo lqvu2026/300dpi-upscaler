@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="300 DPI">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>300 DPI Upscaler</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -150,6 +154,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
               <option value="4x6">4 × 6 in</option>
               <option value="5x7">5 × 7 in</option>
               <option value="8x10" selected>8 × 10 in</option>
+              <option value="letter">Letter, 8.5 × 11 in</option>
+              <option value="legal">Legal, 8.5 × 14 in</option>
+              <option value="tabloid">Tabloid, 11 × 17 in</option>
               <option value="11x14">11 × 14 in</option>
               <option value="16x20">16 × 20 in</option>
               <option value="a5">A5</option>
@@ -230,7 +237,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 (function () {
   var DPI = 300;
   var MAX_SIDE = 16000, MAX_PIXELS = 120e6;
-  var PRESETS = { "4x6": [4, 6], "5x7": [5, 7], "8x10": [8, 10], "11x14": [11, 14], "16x20": [16, 20], "a5": [5.83, 8.27], "a4": [8.27, 11.69], "a3": [11.69, 16.54] };
+  var PRESETS = { "4x6": [4, 6], "5x7": [5, 7], "8x10": [8, 10], "letter": [8.5, 11], "legal": [8.5, 14], "tabloid": [11, 17], "11x14": [11, 14], "16x20": [16, 20], "a5": [5.83, 8.27], "a4": [8.27, 11.69], "a3": [11.69, 16.54] };
   var $ = function (id) { return document.getElementById(id); };
   var state = { img: null, w: 0, h: 0, name: "sample", result: null, busy: false, downloads: null, dlChecked: false };
 
