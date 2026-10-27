@@ -4,11 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="300 DPI">
-<link rel="apple-touch-icon" href="300dpi-upscaler-icon.png">
-<link rel="icon" type="image/png" href="300dpi-upscaler-icon.png">
 <title>300 DPI Upscaler</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -115,6 +110,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .fine { color: var(--muted); font-size: 0.82rem; max-width: 62ch; }
 @media (prefers-reduced-motion: no-preference) { button, .drop { transition: border-color 0.15s, background 0.15s; } }
+[hidden] { display: none !important; }
+.fx { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.fx + .fx { border-top: 1px solid var(--line); padding-top: 14px; }
+.fx-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.toggle span { font-size: 0.9rem; color: var(--muted); }
+.toggle strong { display: block; font-weight: 600; font-size: 0.95rem; color: var(--fg); }
 </style>
 </head>
 <body>
@@ -155,9 +158,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
               <option value="4x6">4 × 6 in</option>
               <option value="5x7">5 × 7 in</option>
               <option value="8x10" selected>8 × 10 in</option>
-              <option value="letter">Letter, 8.5 × 11 in</option>
-              <option value="legal">Legal, 8.5 × 14 in</option>
-              <option value="tabloid">Tabloid, 11 × 17 in</option>
               <option value="11x14">11 × 14 in</option>
               <option value="16x20">16 × 20 in</option>
               <option value="a5">A5</option>
@@ -190,8 +190,39 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
         </div>
       </section>
 
+      <section class="step" aria-labelledby="h-fx">
+        <div class="step-head"><span class="step-n">Step 3</span><h2 id="h-fx">Portrait and soften</h2></div>
+        <div class="fx">
+          <label class="toggle" for="portraitOn">
+            <input type="checkbox" id="portraitOn">
+            <span><strong>Portrait</strong>Blur the background and keep an oval around your subject sharp.</span>
+          </label>
+          <div class="fx-body" id="portraitBody" hidden>
+            <div class="field"><label class="lab" for="pBlur">Background blur <span class="mono" id="pBlurVal">50</span></label>
+              <input type="range" id="pBlur" min="0" max="100" value="50"></div>
+            <div class="field"><label class="lab" for="pSize">Focus size <span class="mono" id="pSizeVal">60</span></label>
+              <input type="range" id="pSize" min="20" max="100" value="60"></div>
+            <div class="field"><label class="lab" for="pX">Focus across <span class="mono" id="pXVal">50</span></label>
+              <input type="range" id="pX" min="0" max="100" value="50"></div>
+            <div class="field"><label class="lab" for="pY">Focus down <span class="mono" id="pYVal">45</span></label>
+              <input type="range" id="pY" min="0" max="100" value="45"></div>
+            <div class="field"><label class="lab" for="pFeather">Edge softness <span class="mono" id="pFeatherVal">60</span></label>
+              <input type="range" id="pFeather" min="0" max="100" value="60"></div>
+            <p class="fine">The dashed oval on the Original preview shows what stays sharp. Move and resize it to fit your subject.</p>
+          </div>
+        </div>
+        <div class="fx">
+          <span class="lab" style="margin:0">Smooth / Soften</span>
+          <div class="field"><label class="lab" for="skin">Skin smoothing <span class="mono" id="skinVal">0</span></label>
+            <input type="range" id="skin" min="0" max="100" value="0"></div>
+          <div class="field"><label class="lab" for="soft">Soft focus glow <span class="mono" id="softVal">0</span></label>
+            <input type="range" id="soft" min="0" max="100" value="0"></div>
+          <p class="fine">Smoothing evens out low-contrast texture such as skin and keeps strong edges like eyes, lips and hair sharp. Soft focus adds a gentle glow over the whole picture.</p>
+        </div>
+      </section>
+
       <section class="step" aria-labelledby="h-fin">
-        <div class="step-head"><span class="step-n">Step 3</span><h2 id="h-fin">Finish and export</h2></div>
+        <div class="step-head"><span class="step-n">Step 4</span><h2 id="h-fin">Finish and export</h2></div>
         <div class="field">
           <label class="lab" for="sharp">Sharpening <span class="mono" id="sharpVal">30</span></label>
           <input type="range" id="sharp" min="0" max="100" value="30">
@@ -238,7 +269,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 (function () {
   var DPI = 300;
   var MAX_SIDE = 16000, MAX_PIXELS = 120e6;
-  var PRESETS = { "4x6": [4, 6], "5x7": [5, 7], "8x10": [8, 10], "letter": [8.5, 11], "legal": [8.5, 14], "tabloid": [11, 17], "11x14": [11, 14], "16x20": [16, 20], "a5": [5.83, 8.27], "a4": [8.27, 11.69], "a3": [11.69, 16.54] };
+  var PRESETS = { "4x6": [4, 6], "5x7": [5, 7], "8x10": [8, 10], "11x14": [11, 14], "16x20": [16, 20], "a5": [5.83, 8.27], "a4": [8.27, 11.69], "a3": [11.69, 16.54] };
   var $ = function (id) { return document.getElementById(id); };
   var state = { img: null, w: 0, h: 0, name: "sample", result: null, busy: false, downloads: null, dlChecked: false };
 
@@ -270,8 +301,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     state.img = img; state.w = w; state.h = h; state.name = name;
     $("srcName").textContent = name; $("srcDims").textContent = w + " × " + h + " px";
     $("metaOrig").textContent = w + " × " + h + " px";
-    drawPreview($("cOrig"), img, w, h);
+    state.srcId = (state.srcId || 0) + 1;
+    if (state.base) { state.base.width = 0; state.base = null; }
+    drawOrig();
     update();
+  }
+  function drawOrig() {
+    if (!state.img) return;
+    var cv = $("cOrig"); drawPreview(cv, state.img, state.w, state.h);
+    var f = readFx(); if (!f.portrait) return;
+    var o = oval(cv.width, cv.height, f), x = cv.getContext("2d");
+    x.save(); x.beginPath(); x.ellipse(o.cx, o.cy, o.rx, o.ry, 0, 0, Math.PI * 2);
+    x.lineWidth = 3; x.strokeStyle = "rgba(0,0,0,0.55)"; x.setLineDash([]); x.stroke();
+    x.lineWidth = 1.5; x.strokeStyle = "#ffffff"; x.setLineDash([8, 6]); x.stroke(); x.restore();
   }
   function loadSample() { var c = makeSample(); setSource(c, c.width, c.height, "Sample image"); }
   function loadFile(file) {
@@ -379,6 +421,78 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     return out;
   }
 
+  /* ---------- portrait and soften ---------- */
+  function readFx() {
+    return {
+      portrait: $("portraitOn").checked, pBlur: +$("pBlur").value, pSize: +$("pSize").value,
+      pX: +$("pX").value, pY: +$("pY").value, pFeather: +$("pFeather").value,
+      skin: +$("skin").value, soft: +$("soft").value
+    };
+  }
+  function oval(w, h, f) {
+    var rx = Math.max(1, f.pSize / 100 * w / 2);
+    return { cx: f.pX / 100 * w, cy: f.pY / 100 * h, rx: rx, ry: rx * 1.3 };
+  }
+  /* Blur by shrinking in halves and enlarging back. Works in every browser and stays fast on big images. */
+  function blurCanvas(src, r) {
+    var w = src.width, h = src.height, levels = Math.min(7, Math.floor(Math.log2(Math.max(1, r))));
+    if (levels < 1) return stepTo(src, w, h, w, h);
+    var dims = [[w, h]], chain = [src], i;
+    for (i = 1; i <= levels; i++) {
+      var dw = Math.max(1, Math.round(w / Math.pow(2, i))), dh = Math.max(1, Math.round(h / Math.pow(2, i)));
+      var prev = chain[chain.length - 1];
+      chain.push(stepTo(prev, prev.width, prev.height, dw, dh)); dims.push([dw, dh]);
+    }
+    var cur = chain.pop();
+    for (i = levels - 1; i >= 0; i--) {
+      var up = stepTo(cur, cur.width, cur.height, dims[i][0], dims[i][1]);
+      cur.width = 0; cur = up;
+      if (i > 0) { var old = chain.pop(); if (old !== src) old.width = 0; }
+    }
+    return cur;
+  }
+  function softFocus(c, amount) {
+    var g = blurCanvas(c, Math.max(3, Math.max(c.width, c.height) * 0.012)), x = c.getContext("2d");
+    x.globalAlpha = 0.55 * amount; x.drawImage(g, 0, 0);
+    x.globalCompositeOperation = "screen"; x.globalAlpha = 0.3 * amount; x.drawImage(g, 0, 0);
+    x.globalCompositeOperation = "source-over"; x.globalAlpha = 1; g.width = 0;
+  }
+  async function smoothSkin(c, amount) {
+    var w = c.width, h = c.height, cx = c.getContext("2d"), BAND = 128;
+    var bl = blurCanvas(c, Math.max(2, Math.max(w, h) * 0.004)), bx = bl.getContext("2d");
+    var T = 10 + 20 * amount;
+    for (var y0 = 0; y0 < h; y0 += BAND) {
+      var bh = Math.min(BAND, h - y0), o = cx.getImageData(0, y0, w, bh), d = o.data, bd = bx.getImageData(0, y0, w, bh).data;
+      for (var i = 0; i < d.length; i += 4) {
+        var dr = bd[i] - d[i], dg = bd[i + 1] - d[i + 1], db = bd[i + 2] - d[i + 2];
+        var t = Math.abs(0.299 * dr + 0.587 * dg + 0.114 * db) / T, wt = amount * Math.exp(-t * t);
+        d[i] += wt * dr; d[i + 1] += wt * dg; d[i + 2] += wt * db;
+      }
+      cx.putImageData(o, 0, y0);
+      if ((y0 / BAND) % 4 === 3) { setStatus("Smoothing " + Math.round(y0 / h * 100) + "%…"); await tick(); }
+    }
+    bl.width = 0;
+    return c;
+  }
+  function portrait(c, f) {
+    var w = c.width, h = c.height;
+    var out = blurCanvas(c, Math.max(2, Math.max(w, h) * 0.02 * f.pBlur / 100));
+    var mw = 512, mh = Math.max(1, Math.round(512 * h / w)), m = document.createElement("canvas");
+    m.width = mw; m.height = mh;
+    var mx = m.getContext("2d"), o = oval(mw, mh, f), inner = Math.min(0.999, Math.max(0, 1 - f.pFeather / 100));
+    var g = null;
+    mx.save(); mx.translate(o.cx, o.cy); mx.scale(1, o.ry / o.rx);
+    g = mx.createRadialGradient(0, 0, 0, 0, 0, o.rx);
+    g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(inner, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    mx.fillStyle = g; mx.fillRect(-mw * 4, -mh * 6, mw * 8, mh * 12); mx.restore();
+    var s = document.createElement("canvas"); s.width = w; s.height = h;
+    var sx = s.getContext("2d"); sx.drawImage(c, 0, 0);
+    sx.globalCompositeOperation = "destination-in"; sx.drawImage(m, 0, 0, w, h);
+    out.getContext("2d").drawImage(s, 0, 0);
+    s.width = 0; c.width = 0;
+    return out;
+  }
+
   /* ---------- DPI metadata ---------- */
   var CRC = (function () { var t = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
   function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
@@ -409,7 +523,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     state.busy = true; $("runBtn").disabled = true; $("saveRow").hidden = true;
     var png = checked("fmt") === "png", mime = png ? "image/png" : "image/jpeg";
     try {
-      var c = await resize(state.img, state.w, state.h, t.w, t.h);
+      var key = state.srcId + ":" + t.w + "x" + t.h, cacheable = t.w * t.h <= 40e6, c;
+      if (!state.base || state.baseKey !== key) {
+        if (state.base) { state.base.width = 0; state.base = null; }
+        var big = await resize(state.img, state.w, state.h, t.w, t.h);
+        if (cacheable) { state.base = big; state.baseKey = key; } else c = big;
+      }
+      if (cacheable) { c = document.createElement("canvas"); c.width = state.base.width; c.height = state.base.height; c.getContext("2d").drawImage(state.base, 0, 0); }
+      var f = readFx();
+      if (f.portrait && f.pBlur > 0) { setStatus("Blurring the background…"); await tick(); c = portrait(c, f); }
+      if (f.skin > 0) { setStatus("Smoothing…"); await tick(); c = await smoothSkin(c, f.skin / 100); }
+      if (f.soft > 0) { setStatus("Adding soft focus…"); await tick(); softFocus(c, f.soft / 100); }
       var k = parseInt($("sharp").value, 10) / 100 * 1.5;
       if (k > 0) c = await sharpen(c, k);
       setStatus("Encoding the file…"); await tick();
@@ -464,12 +588,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     $("printGroup").hidden = scale; $("scaleGroup").hidden = !scale;
     $("customRow").hidden = scale || $("preset").value !== "custom";
     $("qRow").hidden = checked("fmt") !== "jpg";
-    $("sharpVal").textContent = $("sharp").value; $("qVal").textContent = $("quality").value;
+    $("portraitBody").hidden = !$("portraitOn").checked;
+    document.querySelectorAll('input[type="range"]').forEach(function (r) { var v = $(r.id + "Val"); if (v) v.textContent = r.value; });
+    $("qVal").textContent = $("quality").value;
     update();
   }
-  function changed() { syncUi(); if (state.result && !state.busy) setStatus("Settings changed. Press Upscale to update the result."); }
+  function changed() { syncUi(); drawOrig(); if (state.result && !state.busy) setStatus("Settings changed. Press Upscale to update the result."); }
 
-  ["modePrint", "modeScale", "preset", "customVal", "unit", "sc2", "sc3", "sc4", "sharp", "quality", "fmtPng", "fmtJpg"].forEach(function (id) {
+  ["modePrint", "modeScale", "preset", "customVal", "unit", "sc2", "sc3", "sc4", "sharp", "quality", "fmtPng", "fmtJpg", "portraitOn", "pBlur", "pSize", "pX", "pY", "pFeather", "skin", "soft"].forEach(function (id) {
     $(id).addEventListener("input", changed); $(id).addEventListener("change", changed);
   });
   $("file").addEventListener("change", function (e) { loadFile(e.target.files && e.target.files[0]); });
